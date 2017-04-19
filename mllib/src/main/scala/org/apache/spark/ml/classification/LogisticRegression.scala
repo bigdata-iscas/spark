@@ -1650,7 +1650,7 @@ private class LogisticCostFun(
     bcFeaturesStd: Broadcast[Array[Double]],
     regParamL2: Double,
     multinomial: Boolean,
-    aggregationDepth: Int) extends DiffFunction[BDV[Double]] {
+    aggregationDepth: Int) extends DiffFunction[BDV[Double]] with Logging{
 
   override def calculate(coefficients: BDV[Double]): (Double, BDV[Double]) = {
     val coeffs = Vectors.fromBreeze(coefficients)
@@ -1709,6 +1709,8 @@ private class LogisticCostFun(
       0.5 * regParamL2 * sum
     }
     bcCoeffs.destroy(blocking = false)
+
+    logInfo("loss of this iteration: %s".format(logisticAggregator.loss + regVal))
 
     (logisticAggregator.loss + regVal, new BDV(totalGradientMatrix.toArray))
   }

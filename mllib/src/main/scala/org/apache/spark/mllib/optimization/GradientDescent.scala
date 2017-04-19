@@ -253,6 +253,9 @@ object GradientDescent extends Logging {
          * and regVal is the regularization value computed in the previous iteration as well.
          */
         stochasticLossHistory += lossSum / miniBatchSize + regVal
+
+        logInfo("loss of this iteration: %s".format(stochasticLossHistory))
+
         val update = updater.compute(
           weights, Vectors.fromBreeze(gradientSum / miniBatchSize.toDouble),
           stepSize, i, regParam)

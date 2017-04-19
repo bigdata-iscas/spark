@@ -308,6 +308,9 @@ class KMeans private (
       }
 
       cost = costAccum.value
+
+      logInfo("cost of this iteration: %s".format(cost))
+
       iteration += 1
     }
 
