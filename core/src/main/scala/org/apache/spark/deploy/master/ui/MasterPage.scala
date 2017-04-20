@@ -76,8 +76,8 @@ private[ui] class MasterPage(parent: MasterWebUI) extends WebUIPage("") {
     val aliveWorkers = state.workers.filter(_.state == WorkerState.ALIVE)
     val workerTable = UIUtils.listingTable(workerHeaders, workerRow, workers)
 
-    val appHeaders = Seq("Application ID", "Name", "Cores", "Memory per Node", "Submitted Time",
-      "User", "State", "Duration")
+    val appHeaders = Seq("Application ID", "Name", "App Cores (Used/Max)", "Executors Used",
+      "Submitted Time", "User", "State", "Duration")
     val activeApps = state.activeApps.sortBy(_.startTime).reverse
     val activeAppsTable = UIUtils.listingTable(appHeaders, appRow, activeApps)
     val completedApps = state.completedApps.sortBy(_.endTime).reverse
@@ -170,7 +170,7 @@ private[ui] class MasterPage(parent: MasterWebUI) extends WebUIPage("") {
           }
         </div>;
 
-    UIUtils.basicSparkPage(content, "Spark Master at " + state.uri)
+    UIUtils.basicSparkPage(content, "ISCAS Spark Master at " + state.uri)
   }
 
   private def workerRow(worker: WorkerInfo): Seq[Node] = {
@@ -217,10 +217,14 @@ private[ui] class MasterPage(parent: MasterWebUI) extends WebUIPage("") {
         }
       </td>
       <td>
-        {app.coresGranted}
+        {app.coresGranted}/{app.desc.maxCores.getOrElse(0)}
       </td>
-      <td sorttable_customkey={app.desc.memoryPerExecutorMB.toString}>
-        {Utils.megabytesToString(app.desc.memoryPerExecutorMB)}
+//      <td sorttable_customkey={app.desc.memoryPerExecutorMB.toString}>
+//        {Utils.megabytesToString(app.desc.memoryPerExecutorMB)}
+//      </td>
+      <td>
+        {app.executors.size} (each has {app.desc.coresPerExecutor.getOrElse(1)} cores,
+        {Utils.megabytesToString(app.desc.memoryPerExecutorMB)} MB)
       </td>
       <td>{UIUtils.formatDate(app.submitDate)}</td>
       <td>{app.desc.user}</td>

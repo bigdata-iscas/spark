@@ -687,8 +687,11 @@ private[deploy] class Master(
     // If the number of cores per executor is specified, we divide the cores assigned
     // to this worker evenly among the executors with no remainder.
     // Otherwise, we launch a single executor that grabs all the assignedCores on this worker.
-    val numExecutors = coresPerExecutor.map { assignedCores / _ }.getOrElse(1)
-    val coresToAssign = coresPerExecutor.getOrElse(assignedCores)
+    // val numExecutors = coresPerExecutor.map { assignedCores / _ }.getOrElse(1)
+    // val coresToAssign = coresPerExecutor.getOrElse(assignedCores)
+    val numExecutors = assignedCores / coresPerExecutor.getOrElse(1)
+    val coresToAssign = coresPerExecutor.getOrElse(1)
+
     for (i <- 1 to numExecutors) {
       val exec = app.addExecutor(worker, coresToAssign)
       launchExecutor(worker, exec)
