@@ -219,12 +219,9 @@ private[ui] class MasterPage(parent: MasterWebUI) extends WebUIPage("") {
       <td>
         {app.coresGranted}/{app.desc.maxCores.getOrElse(0)}
       </td>
-//      <td sorttable_customkey={app.desc.memoryPerExecutorMB.toString}>
-//        {Utils.megabytesToString(app.desc.memoryPerExecutorMB)}
-//      </td>
       <td>
         {app.executors.size} (each has {app.desc.coresPerExecutor.getOrElse(1)} cores,
-        {Utils.megabytesToString(app.desc.memoryPerExecutorMB)} MB)
+        {Utils.megabytesToString(app.desc.memoryPerExecutorMB)} RAM)
       </td>
       <td>{UIUtils.formatDate(app.submitDate)}</td>
       <td>{app.desc.user}</td>
