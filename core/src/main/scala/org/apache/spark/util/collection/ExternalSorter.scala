@@ -214,12 +214,12 @@ private[spark] class ExternalSorter[K, V, C](
     var estimatedSize = 0L
     if (usingMap) {
       estimatedSize = map.estimateSize()
-      if (maybeSpill(map, estimatedSize)) {
+      if (maybeSpill(map, map.size, estimatedSize)) {
         map = new PartitionedAppendOnlyMap[K, C]
       }
     } else {
       estimatedSize = buffer.estimateSize()
-      if (maybeSpill(buffer, estimatedSize)) {
+      if (maybeSpill(buffer, buffer.size, estimatedSize)) {
         buffer = new PartitionedPairBuffer[K, C]
       }
     }

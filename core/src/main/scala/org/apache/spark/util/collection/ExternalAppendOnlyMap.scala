@@ -161,7 +161,7 @@ class ExternalAppendOnlyMap[K, V, C](
       if (estimatedSize > _peakMemoryUsedBytes) {
         _peakMemoryUsedBytes = estimatedSize
       }
-      if (maybeSpill(currentMap, estimatedSize)) {
+      if (maybeSpill(currentMap, currentMap.size, estimatedSize)) {
         currentMap = new SizeTrackingAppendOnlyMap[K, C]
       }
       currentMap.changeValue(curEntry._1, update)

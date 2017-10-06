@@ -93,6 +93,8 @@ private[spark] class PartitionedPairBuffer[K, V](initialCapacity: Int = 64)
       pair
     }
   }
+
+  def size: Int = curSize
 }
 
 private object PartitionedPairBuffer {

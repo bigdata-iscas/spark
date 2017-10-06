@@ -81,11 +81,14 @@ private[spark] abstract class Spillable[C](taskMemoryManager: TaskMemoryManager)
    * @param currentMemory estimated size of the collection in bytes
    * @return true if `collection` was spilled to disk; false otherwise
    */
-  protected def maybeSpill(collection: C, currentMemory: Long): Boolean = {
+  protected def maybeSpill(collection: C, collectionLength: Int, currentMemory: Long): Boolean = {
     var shouldSpill = false
     if (elementsRead % recordsCheckInterval == 0 && currentMemory >= myMemoryThreshold) {
       // Claim up to double our current memory from the shuffle memory pool
       val amountToRequest = 2 * currentMemory - myMemoryThreshold
+      logDebug("[SpillCheck] recordsRead = " + elementsRead
+        + ", inMemRecordsNum = " + collectionLength
+        + ", currentMemory = " + org.apache.spark.util.Utils.bytesToString(currentMemory))
       val granted = acquireMemory(amountToRequest)
       myMemoryThreshold += granted
       // If we were granted too little memory to grow further (either tryToAcquire returned 0,
