@@ -102,3 +102,17 @@ in the online documentation for an overview on how to configure Spark.
 
 Please review the [Contribution to Spark guide](http://spark.apache.org/contributing.html)
 for information on how to get started contributing to the project.
+
+
+## Building a Runnable Distribution
+ 
+ To create a Spark distribution like those distributed by the Spark Downloads page, and that is laid out so as to be runnable,
+ use `./dev/make-distribution.sh` in the project root directory. It can be configured with Maven profile settings and so on
+ like the direct Maven build. Example:
+
+ ```
+ mvn versions:set -DnewVersion=xxx (2.1.10.6)
+ export MAVEN_OPTS="-Xmx3g -XX:ReservedCodeCacheSize=512m"
+ ./dev/make-distribution.sh --name iscas --pip --tgz -Phadoop-2.7 -Phive -Phive-thriftserver -Pscala-2.11 -Pyarn -Dhadoop.version=2.7.1 -DskipTests
+ ```
+ This will build Spark distribution along with Python pip packages (be sure to upgrade pip firstly). For more information on usage, run `./dev/make-distribution.sh --help`
