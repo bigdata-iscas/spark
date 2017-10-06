@@ -117,6 +117,10 @@ class ExternalAppendOnlyMap[K, V, C](
 
   @volatile private var readingIterator: SpillableIterator = null
 
+  private var previous_spills_writeTime: Long = 0L
+  private var previous_spills_recordsWritten: Long = 0L
+  private var previous_spills__bytesWritten: Long = 0L
+
   /**
    * Number of files this map has spilled so far.
    * Exposed for testing.
@@ -185,6 +189,19 @@ class ExternalAppendOnlyMap[K, V, C](
     val inMemoryIterator = currentMap.destructiveSortedIterator(keyComparator)
     val diskMapIterator = spillMemoryIteratorToDisk(inMemoryIterator)
     spilledMaps += diskMapIterator
+
+    val spill_writeTime = writeMetrics.writeTime - previous_spills_writeTime
+    val spill_recordsWritten = writeMetrics.recordsWritten - previous_spills_recordsWritten
+    val spill_bytesWritten = writeMetrics.bytesWritten - previous_spills__bytesWritten
+
+    previous_spills_writeTime = writeMetrics.writeTime
+    previous_spills_recordsWritten = writeMetrics.recordsWritten
+    previous_spills__bytesWritten = writeMetrics.bytesWritten
+
+    logInfo(s"[Task ${context.taskAttemptId} SpillMetrics] release = " +
+      org.apache.spark.util.Utils.bytesToString(getUsed()) + ", writeTime = "
+      + spill_writeTime + ", recordsWritten = " + spill_recordsWritten
+      + ", bytesWritten = " + spill_bytesWritten)
   }
 
   /**
@@ -577,6 +594,20 @@ class ExternalAppendOnlyMap[K, V, C](
         logInfo(s"Task ${context.taskAttemptId} force spilling in-memory map to disk and " +
           s"it will release ${org.apache.spark.util.Utils.bytesToString(getUsed())} memory")
         nextUpstream = spillMemoryIteratorToDisk(upstream)
+
+        val spill_writeTime = writeMetrics.writeTime - previous_spills_writeTime
+        val spill_recordsWritten = writeMetrics.recordsWritten - previous_spills_recordsWritten
+        val spill_bytesWritten = writeMetrics.bytesWritten - previous_spills__bytesWritten
+
+        previous_spills_writeTime = writeMetrics.writeTime
+        previous_spills_recordsWritten = writeMetrics.recordsWritten
+        previous_spills__bytesWritten = writeMetrics.bytesWritten
+
+        logInfo(s"[Task ${context.taskAttemptId} SpillMetrics] release = " +
+          org.apache.spark.util.Utils.bytesToString(getUsed()) + ", writeTime = "
+          + spill_writeTime + ", recordsWritten = " + spill_recordsWritten
+          + ", bytesWritten = " + spill_bytesWritten)
+
         hasSpilled = true
         true
       }
