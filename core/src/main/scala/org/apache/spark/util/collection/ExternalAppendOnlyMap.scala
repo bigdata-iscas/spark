@@ -269,6 +269,9 @@ class ExternalAppendOnlyMap[K, V, C](
       }
     }
 
+    logDebug("[DiskMapIterator] file = " + file.getAbsolutePath + ", blockId = "
+            + blockId + ", batchSizes = " + batchSizes)
+
     new DiskMapIterator(file, blockId, batchSizes)
   }
 
@@ -322,6 +325,7 @@ class ExternalAppendOnlyMap[K, V, C](
     private val inputStreams = (Seq(sortedMap) ++ spilledMaps).map(it => it.buffered)
 
     inputStreams.foreach { it =>
+      // build a heap to sort records
       val kcPairs = new ArrayBuffer[(K, C)]
       readNextHashCode(it, kcPairs)
       if (kcPairs.length > 0) {
@@ -503,6 +507,9 @@ class ExternalAppendOnlyMap[K, V, C](
         assert(end >= start, "start = " + start + ", end = " + end +
           ", batchOffsets = " + batchOffsets.mkString("[", ", ", "]"))
 
+        logDebug("[DiskMapIterator.nextBatchStream] start = " + start + ", end = " + end +
+          ", batchOffsets = " + batchOffsets.mkString("[", ", ", "]"))
+
         val bufferedStream = new BufferedInputStream(ByteStreams.limit(fileStream, end - start))
         val wrappedStream = serializerManager.wrapStream(blockId, bufferedStream)
         ser.deserializeStream(wrappedStream)
@@ -534,6 +541,11 @@ class ExternalAppendOnlyMap[K, V, C](
         case e: EOFException =>
           cleanup()
           null
+        case e2: OutOfMemoryError =>
+          logError(s"[Task ${context.taskAttemptId} OOM] MemoryUsage = " +
+            org.apache.spark.util.Utils.bytesToString(getUsed()) + ", objectsRead = " +
+            objectsRead)
+          throw e2
       }
     }
 
