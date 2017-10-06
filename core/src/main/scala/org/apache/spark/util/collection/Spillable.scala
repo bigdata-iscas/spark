@@ -88,7 +88,8 @@ private[spark] abstract class Spillable[C](taskMemoryManager: TaskMemoryManager)
       val amountToRequest = 2 * currentMemory - myMemoryThreshold
       logDebug("[SpillCheck] recordsRead = " + elementsRead
         + ", inMemRecordsNum = " + collectionLength
-        + ", currentMemory = " + org.apache.spark.util.Utils.bytesToString(currentMemory))
+        + ", currentMemory = " + org.apache.spark.util.Utils.bytesToString(currentMemory)
+        + ", myMemoryThreshold = " + org.apache.spark.util.Utils.bytesToString(myMemoryThreshold))
       val granted = acquireMemory(amountToRequest)
       myMemoryThreshold += granted
       // If we were granted too little memory to grow further (either tryToAcquire returned 0,
