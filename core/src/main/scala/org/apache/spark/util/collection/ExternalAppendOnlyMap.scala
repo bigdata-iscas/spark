@@ -268,6 +268,8 @@ class ExternalAppendOnlyMap[K, V, C](
       }
     }
 
+    logDebug("[DiskMapIterator] file = " + file.getAbsolutePath + ", blockId = "
+      + blockId + ", batchSizesArrayLen = " + batchSizes.length)
     new DiskMapIterator(file, blockId, batchSizes)
   }
 
