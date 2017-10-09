@@ -139,7 +139,7 @@ public class TaskMemoryManager {
     // optimization now in case we forget to undo it late when making changes.
     synchronized (this) {
       long got = memoryManager.acquireExecutionMemory(required, taskAttemptId, mode);
-      logger.debug("Task {} required {} and got {} for {}", taskAttemptId,
+      logger.debug("[Require] Task {} required {} and got {} for {}", taskAttemptId,
               Utils.bytesToString(required), Utils.bytesToString(got), consumer);
 
       // Try to release memory from other consumers first, then we can reduce the frequency of
@@ -184,8 +184,8 @@ public class TaskMemoryManager {
       }
 
       consumers.add(consumer);
-      logger.debug("Task {} acquired {} (currentMem = {}) for {}", taskAttemptId, Utils.bytesToString(got),
-              Utils.bytesToString(consumer.getUsed()), consumer);
+      logger.debug("[Acquired] Task {} acquired {} (currentMem = {}) for {}", taskAttemptId, Utils.bytesToString(got),
+              Utils.bytesToString(consumer.getUsed() + got), consumer);
       return got;
     }
   }
@@ -194,7 +194,7 @@ public class TaskMemoryManager {
    * Release N bytes of execution memory for a MemoryConsumer.
    */
   public void releaseExecutionMemory(long size, MemoryConsumer consumer) {
-    logger.debug("Task {} release {} from {}", taskAttemptId, Utils.bytesToString(size), consumer);
+    logger.debug("[Release] Task {} release {} from {}", taskAttemptId, Utils.bytesToString(size), consumer);
     memoryManager.releaseExecutionMemory(size, taskAttemptId, consumer.getMode());
   }
 
