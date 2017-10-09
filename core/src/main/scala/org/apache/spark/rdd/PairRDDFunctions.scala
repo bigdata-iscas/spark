@@ -17,6 +17,7 @@
 
 package org.apache.spark.rdd
 
+import java.lang.management.ManagementFactory
 import java.nio.ByteBuffer
 import java.text.SimpleDateFormat
 import java.util.{Date, HashMap => JHashMap, Locale}
@@ -44,7 +45,7 @@ import org.apache.spark.executor.OutputMetrics
 import org.apache.spark.internal.Logging
 import org.apache.spark.partial.{BoundedDouble, PartialResult}
 import org.apache.spark.serializer.Serializer
-import org.apache.spark.util.{SerializableConfiguration, Utils}
+import org.apache.spark.util.{SerializableConfiguration, SizeEstimator, Utils}
 import org.apache.spark.util.collection.CompactBuffer
 import org.apache.spark.util.random.StratifiedSamplingUtils
 
@@ -1120,13 +1121,31 @@ class PairRDDFunctions[K, V](self: RDD[(K, V)])
       require(writer != null, "Unable to obtain RecordWriter")
       var recordsWritten = 0L
       Utils.tryWithSafeFinallyAndFailureCallbacks {
-        while (iter.hasNext) {
-          val pair = iter.next()
-          writer.write(pair._1, pair._2)
+        var pair: (K, V) = null
+        try {
+          while (iter.hasNext) {
+            pair = iter.next()
+            writer.write(pair._1, pair._2)
 
-          // Update bytes written metric every few records
-          maybeUpdateOutputMetrics(outputMetricsAndBytesWrittenCallback, recordsWritten)
-          recordsWritten += 1
+            // Update bytes written metric every few records
+            maybeUpdateOutputMetrics(outputMetricsAndBytesWrittenCallback, recordsWritten)
+            recordsWritten += 1
+          }
+        } catch {
+          case eo: OutOfMemoryError =>
+            logError(s"[Task ${context.taskAttemptId} OOM] recordIndex = " + (recordsWritten + 1)
+              + ", recordSize = "
+              + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(pair)))
+
+            val memoryMXBean = ManagementFactory.getMemoryMXBean
+            val heapUsage = memoryMXBean.getHeapMemoryUsage
+            val used = heapUsage.getUsed
+            val committed = heapUsage.getCommitted
+            val max = heapUsage.getMax
+
+            logError("[CurrentHeapMemoryUsage] " + "used = " + used + ", committed = "
+              + committed + ", max = " + max)
+            throw eo
         }
       }(finallyBlock = writer.close(hadoopContext))
       committer.commitTask(hadoopContext)
@@ -1207,13 +1226,31 @@ class PairRDDFunctions[K, V](self: RDD[(K, V)])
       var recordsWritten = 0L
 
       Utils.tryWithSafeFinallyAndFailureCallbacks {
-        while (iter.hasNext) {
-          val record = iter.next()
-          writer.write(record._1.asInstanceOf[AnyRef], record._2.asInstanceOf[AnyRef])
+        var record: (K, V) = null
+        try {
+          while (iter.hasNext) {
+            record = iter.next()
+            writer.write(record._1.asInstanceOf[AnyRef], record._2.asInstanceOf[AnyRef])
 
-          // Update bytes written metric every few records
-          maybeUpdateOutputMetrics(outputMetricsAndBytesWrittenCallback, recordsWritten)
-          recordsWritten += 1
+            // Update bytes written metric every few records
+            maybeUpdateOutputMetrics(outputMetricsAndBytesWrittenCallback, recordsWritten)
+            recordsWritten += 1
+          }
+        } catch {
+          case eo: OutOfMemoryError =>
+            logError(s"[Task ${context.taskAttemptId} OOM] recordIndex = " + (recordsWritten + 1)
+              + ", recordSize = "
+              + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(record)))
+
+            val memoryMXBean = ManagementFactory.getMemoryMXBean
+            val heapUsage = memoryMXBean.getHeapMemoryUsage
+            val used = heapUsage.getUsed
+            val committed = heapUsage.getCommitted
+            val max = heapUsage.getMax
+
+            logError("[CurrentHeapMemoryUsage] " + "used = " + used + ", committed = "
+              + committed + ", max = " + max)
+            throw eo
         }
       }(finallyBlock = writer.close())
       writer.commit()

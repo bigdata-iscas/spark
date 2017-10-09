@@ -18,6 +18,7 @@
 package org.apache.spark.util.collection
 
 import java.io._
+import java.lang.management.ManagementFactory
 import java.util.Comparator
 
 import scala.collection.BufferedIterator
@@ -32,7 +33,7 @@ import org.apache.spark.executor.ShuffleWriteMetrics
 import org.apache.spark.internal.Logging
 import org.apache.spark.serializer.{DeserializationStream, Serializer, SerializerManager}
 import org.apache.spark.storage.{BlockId, BlockManager}
-import org.apache.spark.util.CompletionIterator
+import org.apache.spark.util.{CompletionIterator, SizeEstimator}
 import org.apache.spark.util.collection.ExternalAppendOnlyMap.HashComparator
 
 /**
@@ -95,6 +96,10 @@ class ExternalAppendOnlyMap[K, V, C](
    * grow internal data structures by growing + copying every time the number of objects doubles.
    */
   private val serializerBatchSize = sparkConf.getLong("spark.shuffle.spill.batchSize", 10000)
+  private val estimateDeserMemory =
+    sparkConf.getBoolean("spark.shuffle.spill.estimateDeserMemory", false)
+  private val estimateRecordSizeInterval =
+    sparkConf.getLong("spark.shuffle.spill.estimateRecordSizeInterval", -1)
 
   // Number of bytes spilled in total
   private var _diskBytesSpilled = 0L
@@ -118,6 +123,17 @@ class ExternalAppendOnlyMap[K, V, C](
 
   private var previous_spills_recordsWritten: Long = 0L
   private var previous_spills__bytesWritten: Long = 0L
+
+  private val memoryMXBean = ManagementFactory.getMemoryMXBean
+
+
+  def getHeapUsage(): String = {
+    val heapUsage = memoryMXBean.getHeapMemoryUsage
+    val used = heapUsage.getUsed
+    val committed = heapUsage.getCommitted
+    val max = heapUsage.getMax
+    "used = " + used + ", committed = " + committed + ", max = " + max
+  }
 
   /**
    * Number of files this map has spilled so far.
@@ -232,6 +248,10 @@ class ExternalAppendOnlyMap[K, V, C](
 
     // Flush the disk writer's contents to disk, and update relevant variables
     def flush(): Unit = {
+      if (estimateDeserMemory) {
+        logDebug("[SpillMemoryIteratorToDisk.writer.flush.memoryUsage] "
+          + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(writer)))
+      }
       val segment = writer.commitAndGet()
       batchSizes += segment.length
       _diskBytesSpilled += segment.length
@@ -243,6 +263,13 @@ class ExternalAppendOnlyMap[K, V, C](
       while (inMemoryIterator.hasNext) {
         val kv = inMemoryIterator.next()
         writer.write(kv._1, kv._2)
+
+        if (estimateRecordSizeInterval > 0 && objectsWritten % estimateRecordSizeInterval == 0) {
+          logDebug("[SpillMemoryIteratorToDisk.writer.record] recordIndex = " + (objectsWritten + 1)
+            + ", recordSize = "
+            + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(kv)))
+        }
+
         objectsWritten += 1
 
         if (objectsWritten == serializerBatchSize) {
@@ -509,10 +536,19 @@ class ExternalAppendOnlyMap[K, V, C](
 
         logDebug("[DiskMapIterator.nextBatchStream] start = " + start + ", end = " + end +
           ", batchOffsets = " + batchOffsets.mkString("[", ", ", "]"))
+        logDebug("[DiskMapIterator.beforeRead.heapUsage] " + getHeapUsage)
 
         val bufferedStream = new BufferedInputStream(ByteStreams.limit(fileStream, end - start))
         val wrappedStream = serializerManager.wrapStream(blockId, bufferedStream)
-        ser.deserializeStream(wrappedStream)
+        val deser = ser.deserializeStream(wrappedStream)
+
+        logDebug("[DiskMapIterator.afterDeserializeStream.heapUsage] " + getHeapUsage)
+
+        if (estimateDeserMemory) {
+          logDebug("[DiskMapIterator.deserializeStream.memoryUsage] "
+            + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(deserializeStream)))
+        }
+        deser
       } else {
         // No more batches left
         cleanup()
@@ -527,10 +563,11 @@ class ExternalAppendOnlyMap[K, V, C](
      * If no more pairs are left, return null.
      */
     private def readNextItem(): (K, C) = {
+      var item: (K, C) = null
       try {
         val k = deserializeStream.readKey().asInstanceOf[K]
         val c = deserializeStream.readValue().asInstanceOf[C]
-        val item = (k, c)
+        item = (k, c)
         objectsRead += 1
         if (objectsRead == serializerBatchSize) {
           objectsRead = 0
@@ -541,11 +578,17 @@ class ExternalAppendOnlyMap[K, V, C](
         case e: EOFException =>
           cleanup()
           null
-        case e2: OutOfMemoryError =>
-          logError(s"[Task ${context.taskAttemptId} OOM] MemoryUsage = " +
+        case eo: OutOfMemoryError =>
+          logError(s"[Task ${context.taskAttemptId} OOM] In-memory map usage = " +
             org.apache.spark.util.Utils.bytesToString(getUsed()) + ", objectsRead = " +
-            objectsRead)
-          throw e2
+            objectsRead + ", deserializeStreamSize = " +
+            org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(deserializeStream)) +
+            ", currentRecordSize = " +
+            org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(item))
+          )
+          logError("[CurrentHeapMemoryUsage] " + getHeapUsage)
+
+          throw eo
       }
     }
 
@@ -604,7 +647,7 @@ class ExternalAppendOnlyMap[K, V, C](
       if (hasSpilled) {
         false
       } else {
-        logInfo(s"Task ${context.taskAttemptId} force spilling in-memory map to disk and " +
+        logInfo(s"[Spill] Task ${context.taskAttemptId} force spilling in-memory map to disk and " +
           s"it will release ${org.apache.spark.util.Utils.bytesToString(getUsed())} memory")
 
         val start = System.currentTimeMillis()
