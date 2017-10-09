@@ -552,7 +552,7 @@ class ExternalAppendOnlyMap[K, V, C](
 
         if (estimateDeserMemory) {
           logDebug("[DiskMapIterator.deserializer.memoryUsage] "
-            + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(deser)))
+            + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(ser)))
         }
         deser
       } else {
