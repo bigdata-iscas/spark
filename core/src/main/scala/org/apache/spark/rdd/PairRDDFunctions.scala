@@ -56,6 +56,9 @@ class PairRDDFunctions[K, V](self: RDD[(K, V)])
     (implicit kt: ClassTag[K], vt: ClassTag[V], ord: Ordering[K] = null)
   extends Logging with Serializable {
 
+  private val estimateRecordSizeInterval =
+    self.conf.getLong("spark.shuffle.spill.estimateRecordSizeInterval", -1)
+
   /**
    * :: Experimental ::
    * Generic function to combine the elements for each key using a custom set of aggregation
@@ -1127,6 +1130,14 @@ class PairRDDFunctions[K, V](self: RDD[(K, V)])
             pair = iter.next()
             writer.write(pair._1, pair._2)
 
+            if (estimateRecordSizeInterval > 0 &&
+              recordsWritten % estimateRecordSizeInterval == 0) {
+              logDebug("[Record read] recordIndex = " + (recordsWritten + 1)
+                + ", recordSize = "
+                + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(pair))
+                + ", record = (" + pair._1.getClass + ", " + pair._2.getClass + ")")
+            }
+
             // Update bytes written metric every few records
             maybeUpdateOutputMetrics(outputMetricsAndBytesWrittenCallback, recordsWritten)
             recordsWritten += 1
@@ -1135,7 +1146,8 @@ class PairRDDFunctions[K, V](self: RDD[(K, V)])
           case eo: OutOfMemoryError =>
             logError(s"[Task ${context.taskAttemptId} OOM] recordIndex = " + (recordsWritten + 1)
               + ", recordSize = "
-              + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(pair)))
+              + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(pair))
+              + ", record = (" + pair._1.getClass + ", " + pair._2.getClass + ")")
 
             val memoryMXBean = ManagementFactory.getMemoryMXBean
             val heapUsage = memoryMXBean.getHeapMemoryUsage
@@ -1143,8 +1155,10 @@ class PairRDDFunctions[K, V](self: RDD[(K, V)])
             val committed = heapUsage.getCommitted
             val max = heapUsage.getMax
 
-            logError("[CurrentHeapMemoryUsage] " + "used = " + used + ", committed = "
-              + committed + ", max = " + max)
+            logError("[CurrentHeapMemoryUsage] " + "used = "
+              + org.apache.spark.util.Utils.bytesToString(used) + ", committed = "
+              + org.apache.spark.util.Utils.bytesToString(committed)
+              + ", max = " + org.apache.spark.util.Utils.bytesToString(max))
             throw eo
         }
       }(finallyBlock = writer.close(hadoopContext))
@@ -1232,6 +1246,14 @@ class PairRDDFunctions[K, V](self: RDD[(K, V)])
             record = iter.next()
             writer.write(record._1.asInstanceOf[AnyRef], record._2.asInstanceOf[AnyRef])
 
+            if (estimateRecordSizeInterval > 0 &&
+              recordsWritten % estimateRecordSizeInterval == 0) {
+              logDebug("[Record read] recordIndex = " + (recordsWritten + 1)
+                + ", recordSize = "
+                + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(record))
+                + ", record = (" + record._1.getClass + ", " + record._2.getClass + ")")
+            }
+
             // Update bytes written metric every few records
             maybeUpdateOutputMetrics(outputMetricsAndBytesWrittenCallback, recordsWritten)
             recordsWritten += 1
@@ -1240,7 +1262,8 @@ class PairRDDFunctions[K, V](self: RDD[(K, V)])
           case eo: OutOfMemoryError =>
             logError(s"[Task ${context.taskAttemptId} OOM] recordIndex = " + (recordsWritten + 1)
               + ", recordSize = "
-              + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(record)))
+              + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(record))
+              + ", record = (" + record._1.getClass + ", " + record._2.getClass + ")")
 
             val memoryMXBean = ManagementFactory.getMemoryMXBean
             val heapUsage = memoryMXBean.getHeapMemoryUsage
@@ -1248,8 +1271,10 @@ class PairRDDFunctions[K, V](self: RDD[(K, V)])
             val committed = heapUsage.getCommitted
             val max = heapUsage.getMax
 
-            logError("[CurrentHeapMemoryUsage] " + "used = " + used + ", committed = "
-              + committed + ", max = " + max)
+            logError("[CurrentHeapMemoryUsage] " + "used = "
+              + org.apache.spark.util.Utils.bytesToString(used) + ", committed = "
+              + org.apache.spark.util.Utils.bytesToString(committed)
+              + ", max = " + org.apache.spark.util.Utils.bytesToString(max))
             throw eo
         }
       }(finallyBlock = writer.close())

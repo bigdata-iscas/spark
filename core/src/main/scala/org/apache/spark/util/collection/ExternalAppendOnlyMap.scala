@@ -251,16 +251,18 @@ class ExternalAppendOnlyMap[K, V, C](
     // Flush the disk writer's contents to disk, and update relevant variables
     def flush(): Unit = {
       if (estimateDeserMemory) {
-        val serializedRecordSize = SizeEstimator.estimate(ser)
-        logDebug("[Records in the serialized buffer before flush()] recordNum = " + objectsWritten
-          + ", totalSize = "
-          + org.apache.spark.util.Utils.bytesToString(serializedRecordSize)
-          + ", avgSerializedRecordSize = "
-          + org.apache.spark.util.Utils.bytesToString(serializedRecordSize / objectsWritten))
+        logDebug("[Serialized buffer in flush()] serSize = "
+          + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(ser))
+          + ", writerSize = "
+          + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(writer))
+          + ", serializerSize = "
+          + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(serializer)))
       }
+
       val segment = writer.commitAndGet()
       batchSizes += segment.length
       _diskBytesSpilled += segment.length
+
       objectsWritten = 0
     }
 
@@ -271,8 +273,8 @@ class ExternalAppendOnlyMap[K, V, C](
         writer.write(kv._1, kv._2)
 
         if (estimateRecordSizeInterval > 0 && objectsWritten % estimateRecordSizeInterval == 0) {
-          logDebug("[Spill.record] recordIndex = " + (objectsWritten + 1)
-            + ", unSerializedRecordSize = "
+          logDebug("[SpillRecord] recordIndex = " + (objectsWritten + 1)
+            + ", recordUnSerializedSize = "
             + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(kv)))
         }
 
@@ -551,8 +553,12 @@ class ExternalAppendOnlyMap[K, V, C](
         logDebug("[DiskMapIterator.afterDeserializeStream.heapUsage] " + getHeapUsage)
 
         if (estimateDeserMemory) {
-          logDebug("[DiskMapIterator.deserializer.memoryUsage] "
-            + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(ser)))
+          logDebug("[DiskMapIterator.deserializer.memoryUsage] serSize = "
+            + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(ser))
+            + ", deserSize = "
+            + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(deser))
+            + ", bufferedStream = "
+            + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(wrappedStream)))
         }
         deser
       } else {
@@ -591,6 +597,10 @@ class ExternalAppendOnlyMap[K, V, C](
             org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(item)) +
             ", deserializerSize = " +
             org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(ser))
+            + ", deserializeStream = " +
+            org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(deserializeStream))
+            + ", serializerSize = "
+            + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(serializer))
           )
           logError("[CurrentHeapMemoryUsage] " + getHeapUsage)
 
