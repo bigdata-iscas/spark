@@ -220,7 +220,9 @@ class ExternalAppendOnlyMap[K, V, C](
     logInfo(s"[Task ${context.taskAttemptId} SpillMetrics] release = " +
       org.apache.spark.util.Utils.bytesToString(getUsed()) + ", writeTime = "
       + spill_writeTime + " s, recordsWritten = " + spill_recordsWritten
-      + ", bytesWritten = " + org.apache.spark.util.Utils.bytesToString(spill_bytesWritten))
+      + ", bytesWritten = " + org.apache.spark.util.Utils.bytesToString(spill_bytesWritten)
+      + ", avgRecordSize = " +
+      org.apache.spark.util.Utils.bytesToString(spill_bytesWritten / spill_recordsWritten))
   }
 
   /**
@@ -251,12 +253,9 @@ class ExternalAppendOnlyMap[K, V, C](
     // Flush the disk writer's contents to disk, and update relevant variables
     def flush(): Unit = {
       if (estimateDeserMemory) {
-        logDebug("[Serialized buffer in flush()] serSize = "
-          + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(ser))
-          + ", writerSize = "
+        logDebug("[Serialized buffer in flush()] writerSize = "
           + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(writer))
-          + ", serializerSize = "
-          + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(serializer)))
+        )
       }
 
       val segment = writer.commitAndGet()
@@ -275,7 +274,8 @@ class ExternalAppendOnlyMap[K, V, C](
         if (estimateRecordSizeInterval > 0 && objectsWritten % estimateRecordSizeInterval == 0) {
           logDebug("[SpillRecord] recordIndex = " + (objectsWritten + 1)
             + ", recordUnSerializedSize = "
-            + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(kv)))
+            + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(kv))
+            + ", record = (" + kv._1.getClass + ", " + kv._2.getClass + ")")
         }
 
         objectsWritten += 1
@@ -358,6 +358,8 @@ class ExternalAppendOnlyMap[K, V, C](
     private val sortedMap = CompletionIterator[(K, C), Iterator[(K, C)]](destructiveIterator(
       currentMap.destructiveSortedIterator(keyComparator)), freeCurrentMap())
     private val inputStreams = (Seq(sortedMap) ++ spilledMaps).map(it => it.buffered)
+
+    private var recordsRead = 0L
 
     inputStreams.foreach { it =>
       // build a heap to sort records
@@ -461,6 +463,23 @@ class ExternalAppendOnlyMap[K, V, C](
           mergeHeap.enqueue(buffer)
         }
       }
+
+      if (estimateRecordSizeInterval > 0 && recordsRead % estimateRecordSizeInterval == 0) {
+        logDebug("[RecordReadFromMergeHeap] recordIndex = " + (recordsRead + 1)
+          + ", recordSize = "
+          + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(minPair))
+          + ", record = (" + minPair._1.getClass + ", " + minPair._2.getClass + ")")
+        logDebug("[MergeHeap] mergeHeapLength = " + mergeHeap.size
+          + ", mergeHeapBytes = "
+          + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(mergeHeap))
+          + ", mergedBuffersLength = "
+          + mergedBuffers.length
+          + ", mergedBuffersBytes = "
+          + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(mergedBuffers))
+        )
+      }
+
+      recordsRead += 1
 
       (minKey, minCombiner)
     }
@@ -580,6 +599,14 @@ class ExternalAppendOnlyMap[K, V, C](
         val k = deserializeStream.readKey().asInstanceOf[K]
         val c = deserializeStream.readValue().asInstanceOf[C]
         item = (k, c)
+
+        if (estimateRecordSizeInterval > 0 && objectsRead % estimateRecordSizeInterval == 0) {
+          logDebug("[RecordReadFromDisk] recordIndex = " + (objectsRead + 1)
+            + ", recordUnSerializedSize = "
+            + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(item))
+            + ", record = (" + item._1.getClass + ", " + item._2.getClass + ")")
+        }
+
         objectsRead += 1
         if (objectsRead == serializerBatchSize) {
           objectsRead = 0
@@ -595,12 +622,8 @@ class ExternalAppendOnlyMap[K, V, C](
             org.apache.spark.util.Utils.bytesToString(getUsed()) + ", objectsRead = " +
             objectsRead + ", currentRecordSize = " +
             org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(item)) +
-            ", deserializerSize = " +
-            org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(ser))
-            + ", deserializeStream = " +
+            ", deserializeStream = " +
             org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(deserializeStream))
-            + ", serializerSize = "
-            + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(serializer))
           )
           logError("[CurrentHeapMemoryUsage] " + getHeapUsage)
 
@@ -680,7 +703,9 @@ class ExternalAppendOnlyMap[K, V, C](
         logInfo(s"[Task ${context.taskAttemptId} SpillMetrics] release = " +
           org.apache.spark.util.Utils.bytesToString(getUsed()) + ", writeTime = "
           + spill_writeTime + " s, recordsWritten = " + spill_recordsWritten
-          + ", bytesWritten = " + org.apache.spark.util.Utils.bytesToString(spill_bytesWritten))
+          + ", bytesWritten = " + org.apache.spark.util.Utils.bytesToString(spill_bytesWritten)
+          + ", avgRecordSize = " +
+          org.apache.spark.util.Utils.bytesToString(spill_bytesWritten / spill_recordsWritten))
 
         hasSpilled = true
         true
