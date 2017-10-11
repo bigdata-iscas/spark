@@ -200,16 +200,20 @@ public class TaskMemoryManager {
     logger.debug("[Release] Task {} release {} from {}", taskAttemptId, Utils.bytesToString(size), consumer);
     memoryManager.releaseExecutionMemory(size, taskAttemptId, consumer.getMode());
 
-    MemoryMXBean memoryMXBean = ManagementFactory.getMemoryMXBean();
-    MemoryUsage heapUsage = memoryMXBean.getHeapMemoryUsage();
-    long used = heapUsage.getUsed();
-    long committed = heapUsage.getCommitted();
-    long max = heapUsage.getMax();
+    if (logger.isDebugEnabled()) {
+      System.gc();
+      MemoryMXBean memoryMXBean = ManagementFactory.getMemoryMXBean();
+      MemoryUsage heapUsage = memoryMXBean.getHeapMemoryUsage();
+      long used = heapUsage.getUsed();
+      long committed = heapUsage.getCommitted();
+      long max = heapUsage.getMax();
 
-    logger.debug("[CurrentHeapMemoryUsage] " + "used = "
-            + org.apache.spark.util.Utils.bytesToString(used) + ", committed = "
-            + org.apache.spark.util.Utils.bytesToString(committed)
-            + ", max = " + org.apache.spark.util.Utils.bytesToString(max));
+      logger.debug("[CurrentHeapMemoryUsage] " + "used = "
+              + org.apache.spark.util.Utils.bytesToString(used) + ", committed = "
+              + org.apache.spark.util.Utils.bytesToString(committed)
+              + ", max = " + org.apache.spark.util.Utils.bytesToString(max));
+    }
+
   }
 
   /**

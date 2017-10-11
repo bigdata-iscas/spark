@@ -1152,6 +1152,7 @@ class PairRDDFunctions[K, V](self: RDD[(K, V)])
               + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(pair))
               + ", record = (" + pair._1.getClass.getSimpleName + ", "
               + pair._2.getClass.getSimpleName + ")"
+              + ", writer = " + writer.getClass.getSimpleName
               + ", writerSize = "
               + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(writer)))
 
@@ -1274,6 +1275,7 @@ class PairRDDFunctions[K, V](self: RDD[(K, V)])
               + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(record))
               + ", record = (" + record._1.getClass.getSimpleName + ", "
               + record._2.getClass.getSimpleName + ")"
+              + ", writer = " + writer.getClass.getSimpleName
               + ", writerSize = "
               + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(writer)))
 

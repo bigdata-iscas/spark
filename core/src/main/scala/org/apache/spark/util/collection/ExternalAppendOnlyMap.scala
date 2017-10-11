@@ -474,7 +474,7 @@ class ExternalAppendOnlyMap[K, V, C](
           + ", mergedBuffersBytes = "
           + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(mergedBuffers)))
         for (i <- 0 until mergedBuffers.length) {
-          logDebug("  [StreamBuffer " + i + "]" + mergedBuffers(i).showSize + ", " +
+          logDebug("  [StreamBuffer " + i + "] " + mergedBuffers(i).showSize + ", " +
             mergedBuffers(i).iterator.getClass.getSimpleName)
         }
       }
