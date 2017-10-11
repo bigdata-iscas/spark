@@ -57,7 +57,7 @@ class PairRDDFunctions[K, V](self: RDD[(K, V)])
   extends Logging with Serializable {
 
   private val estimateRecordSizeInterval =
-    self.conf.getLong("spark.shuffle.spill.estimateRecordSizeInterval", -1)
+    SparkEnv.get.conf.getLong("spark.shuffle.spill.estimateRecordSizeInterval", -1)
 
   /**
    * :: Experimental ::
@@ -1135,7 +1135,10 @@ class PairRDDFunctions[K, V](self: RDD[(K, V)])
               logDebug("[Record read] recordIndex = " + (recordsWritten + 1)
                 + ", recordSize = "
                 + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(pair))
-                + ", record = (" + pair._1.getClass + ", " + pair._2.getClass + ")")
+                + ", record = (" + pair._1.getClass.getSimpleName + ", "
+                + pair._2.getClass.getSimpleName + ")"
+                + ", writerSize = "
+                + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(writer)))
             }
 
             // Update bytes written metric every few records
@@ -1147,7 +1150,10 @@ class PairRDDFunctions[K, V](self: RDD[(K, V)])
             logError(s"[Task ${context.taskAttemptId} OOM] recordIndex = " + (recordsWritten + 1)
               + ", recordSize = "
               + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(pair))
-              + ", record = (" + pair._1.getClass + ", " + pair._2.getClass + ")")
+              + ", record = (" + pair._1.getClass.getSimpleName + ", "
+              + pair._2.getClass.getSimpleName + ")"
+              + ", writerSize = "
+              + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(writer)))
 
             val memoryMXBean = ManagementFactory.getMemoryMXBean
             val heapUsage = memoryMXBean.getHeapMemoryUsage
@@ -1251,7 +1257,10 @@ class PairRDDFunctions[K, V](self: RDD[(K, V)])
               logDebug("[Record read] recordIndex = " + (recordsWritten + 1)
                 + ", recordSize = "
                 + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(record))
-                + ", record = (" + record._1.getClass + ", " + record._2.getClass + ")")
+                + ", record = (" + record._1.getClass.getSimpleName + ", "
+                + record._2.getClass.getSimpleName + ")"
+                + ", writerSize = "
+                + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(writer)))
             }
 
             // Update bytes written metric every few records
@@ -1263,7 +1272,10 @@ class PairRDDFunctions[K, V](self: RDD[(K, V)])
             logError(s"[Task ${context.taskAttemptId} OOM] recordIndex = " + (recordsWritten + 1)
               + ", recordSize = "
               + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(record))
-              + ", record = (" + record._1.getClass + ", " + record._2.getClass + ")")
+              + ", record = (" + record._1.getClass.getSimpleName + ", "
+              + record._2.getClass.getSimpleName + ")"
+              + ", writerSize = "
+              + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(writer)))
 
             val memoryMXBean = ManagementFactory.getMemoryMXBean
             val heapUsage = memoryMXBean.getHeapMemoryUsage

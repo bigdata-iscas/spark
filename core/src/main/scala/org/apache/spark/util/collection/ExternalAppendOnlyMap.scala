@@ -128,6 +128,7 @@ class ExternalAppendOnlyMap[K, V, C](
 
 
   def getHeapUsage(): String = {
+    System.gc()
     val heapUsage = memoryMXBean.getHeapMemoryUsage
     val used = heapUsage.getUsed
     val committed = heapUsage.getCommitted
@@ -135,6 +136,10 @@ class ExternalAppendOnlyMap[K, V, C](
     "used = " + org.apache.spark.util.Utils.bytesToString(used) +
       ", committed = " + org.apache.spark.util.Utils.bytesToString(committed) +
       ", max = " + org.apache.spark.util.Utils.bytesToString(max)
+  }
+
+  def reduceClassName(className: String): String = {
+    className.substring(className.lastIndexOf(".") + 1)
   }
 
   /**
@@ -275,7 +280,8 @@ class ExternalAppendOnlyMap[K, V, C](
           logDebug("[SpillRecord] recordIndex = " + (objectsWritten + 1)
             + ", recordUnSerializedSize = "
             + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(kv))
-            + ", record = (" + kv._1.getClass + ", " + kv._2.getClass + ")")
+            + ", record = (" + kv._1.getClass.getSimpleName + ", "
+            + kv._2.getClass.getSimpleName + ")")
         }
 
         objectsWritten += 1
@@ -454,6 +460,26 @@ class ExternalAppendOnlyMap[K, V, C](
         mergedBuffers += newBuffer
       }
 
+      if (estimateRecordSizeInterval > 0 && recordsRead % estimateRecordSizeInterval == 0) {
+        logDebug("[RecordReadFromMergeHeap] recordIndex = " + (recordsRead + 1)
+          + ", recordSize = "
+          + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(minPair))
+          + ", record = (" + minPair._1.getClass.getSimpleName + ", "
+          + minPair._2.getClass.getSimpleName + ")")
+        logDebug("[RecordReadFromMergeHeap.afterMerge] mergeHeapLength = " + mergeHeap.size
+          + ", mergeHeapBytes = "
+          + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(mergeHeap))
+          + ", mergedBuffersLength = "
+          + mergedBuffers.length
+          + ", mergedBuffersBytes = "
+          + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(mergedBuffers)))
+        for (i <- 0 until mergedBuffers.length) {
+          "  [StreamBuffer " + i + "]" + mergedBuffers(i).showSize + ", " +
+            mergedBuffers(i).iterator.getClass.getSimpleName
+        }
+      }
+
+
       // Repopulate each visited stream buffer and add it back to the queue if it is non-empty
       mergedBuffers.foreach { buffer =>
         if (buffer.isEmpty) {
@@ -465,18 +491,17 @@ class ExternalAppendOnlyMap[K, V, C](
       }
 
       if (estimateRecordSizeInterval > 0 && recordsRead % estimateRecordSizeInterval == 0) {
-        logDebug("[RecordReadFromMergeHeap] recordIndex = " + (recordsRead + 1)
-          + ", recordSize = "
-          + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(minPair))
-          + ", record = (" + minPair._1.getClass + ", " + minPair._2.getClass + ")")
-        logDebug("[MergeHeap] mergeHeapLength = " + mergeHeap.size
+        logDebug("[RecordReadFromMergeHeap.afterReadNewRecord] mergeHeapLength = " + mergeHeap.size
           + ", mergeHeapBytes = "
           + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(mergeHeap))
           + ", mergedBuffersLength = "
           + mergedBuffers.length
           + ", mergedBuffersBytes = "
-          + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(mergedBuffers))
-        )
+          + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(mergedBuffers)))
+        for (i <- 0 until mergedBuffers.length) {
+          "  [StreamBuffer " + i + "]" + mergedBuffers(i).showSize + ", " +
+            mergedBuffers(i).iterator.getClass.getSimpleName
+        }
       }
 
       recordsRead += 1
@@ -510,6 +535,13 @@ class ExternalAppendOnlyMap[K, V, C](
       override def compareTo(other: StreamBuffer): Int = {
         // descending order because mutable.PriorityQueue dequeues the max, not the min
         if (other.minKeyHash < minKeyHash) -1 else if (other.minKeyHash == minKeyHash) 0 else 1
+      }
+
+      def showSize(): String = {
+        "pairsNum = " + pairs.length + ", pairsBytes = " +
+          org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(pairs)) +
+          ", bufferedIteratorSize = " +
+          org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(iterator))
       }
     }
   }
@@ -604,7 +636,8 @@ class ExternalAppendOnlyMap[K, V, C](
           logDebug("[RecordReadFromDisk] recordIndex = " + (objectsRead + 1)
             + ", recordUnSerializedSize = "
             + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(item))
-            + ", record = (" + item._1.getClass + ", " + item._2.getClass + ")")
+            + ", record = (" + item._1.getClass.getSimpleName + ", "
+            + item._2.getClass.getSimpleName + ")")
         }
 
         objectsRead += 1

@@ -19,6 +19,9 @@ package org.apache.spark.memory;
 
 import javax.annotation.concurrent.GuardedBy;
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
+import java.lang.management.MemoryMXBean;
+import java.lang.management.MemoryUsage;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.HashSet;
@@ -196,6 +199,17 @@ public class TaskMemoryManager {
   public void releaseExecutionMemory(long size, MemoryConsumer consumer) {
     logger.debug("[Release] Task {} release {} from {}", taskAttemptId, Utils.bytesToString(size), consumer);
     memoryManager.releaseExecutionMemory(size, taskAttemptId, consumer.getMode());
+
+    MemoryMXBean memoryMXBean = ManagementFactory.getMemoryMXBean();
+    MemoryUsage heapUsage = memoryMXBean.getHeapMemoryUsage();
+    long used = heapUsage.getUsed();
+    long committed = heapUsage.getCommitted();
+    long max = heapUsage.getMax();
+
+    logger.debug("[CurrentHeapMemoryUsage] " + "used = "
+            + org.apache.spark.util.Utils.bytesToString(used) + ", committed = "
+            + org.apache.spark.util.Utils.bytesToString(committed)
+            + ", max = " + org.apache.spark.util.Utils.bytesToString(max));
   }
 
   /**
