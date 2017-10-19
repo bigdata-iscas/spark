@@ -128,7 +128,7 @@ class ExternalAppendOnlyMap[K, V, C](
 
 
   def getHeapUsage(): String = {
-    System.gc()
+    // System.gc()
     val heapUsage = memoryMXBean.getHeapMemoryUsage
     val used = heapUsage.getUsed
     val committed = heapUsage.getCommitted
@@ -467,16 +467,14 @@ class ExternalAppendOnlyMap[K, V, C](
           + ", record = (" + minPair._1.getClass.getSimpleName + ", "
           + minPair._2.getClass.getSimpleName + ")")
         logDebug("[RecordReadFromMergeHeap.afterMerge] mergeHeapLength = " + mergeHeap.size
-          + ", mergeHeapBytes = "
-          + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(mergeHeap))
           + ", mergedBuffersLength = "
-          + mergedBuffers.length
-          + ", mergedBuffersBytes = "
-          + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(mergedBuffers)))
+          + mergedBuffers.length)
+        /*
         for (i <- 0 until mergedBuffers.length) {
           logDebug("  [StreamBuffer " + i + "] " + mergedBuffers(i).showSize + ", " +
             mergedBuffers(i).iterator.getClass.getSimpleName)
         }
+        */
       }
 
 
@@ -593,9 +591,11 @@ class ExternalAppendOnlyMap[K, V, C](
         assert(end >= start, "start = " + start + ", end = " + end +
           ", batchOffsets = " + batchOffsets.mkString("[", ", ", "]"))
 
+        /*
         logDebug("[DiskMapIterator.nextBatchStream] start = " + start + ", end = " + end +
           ", batchOffsets = " + batchOffsets.mkString("[", ", ", "]"))
         logDebug("[DiskMapIterator.beforeRead.heapUsage] " + getHeapUsage)
+        */
 
         val bufferedStream = new BufferedInputStream(ByteStreams.limit(fileStream, end - start))
         val wrappedStream = serializerManager.wrapStream(blockId, bufferedStream)

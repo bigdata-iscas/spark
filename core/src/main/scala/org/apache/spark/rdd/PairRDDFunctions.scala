@@ -56,8 +56,8 @@ class PairRDDFunctions[K, V](self: RDD[(K, V)])
     (implicit kt: ClassTag[K], vt: ClassTag[V], ord: Ordering[K] = null)
   extends Logging with Serializable {
 
-  private val estimateRecordSizeInterval =
-    SparkEnv.get.conf.getLong("spark.shuffle.spill.estimateRecordSizeInterval", -1)
+  // private val estimateRecordSizeInterval =
+  //  SparkEnv.get.conf.getLong("spark.shuffle.spill.estimateRecordSizeInterval", -1)
 
   /**
    * :: Experimental ::
@@ -1130,6 +1130,7 @@ class PairRDDFunctions[K, V](self: RDD[(K, V)])
             pair = iter.next()
             writer.write(pair._1, pair._2)
 
+            /*
             if (estimateRecordSizeInterval > 0 &&
               recordsWritten % estimateRecordSizeInterval == 0) {
               logDebug("[Record read] recordIndex = " + (recordsWritten + 1)
@@ -1140,6 +1141,7 @@ class PairRDDFunctions[K, V](self: RDD[(K, V)])
                 + ", writerSize = "
                 + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(writer)))
             }
+            */
 
             // Update bytes written metric every few records
             maybeUpdateOutputMetrics(outputMetricsAndBytesWrittenCallback, recordsWritten)
@@ -1253,6 +1255,7 @@ class PairRDDFunctions[K, V](self: RDD[(K, V)])
             record = iter.next()
             writer.write(record._1.asInstanceOf[AnyRef], record._2.asInstanceOf[AnyRef])
 
+            /*
             if (estimateRecordSizeInterval > 0 &&
               recordsWritten % estimateRecordSizeInterval == 0) {
               logDebug("[Record read] recordIndex = " + (recordsWritten + 1)
@@ -1263,6 +1266,7 @@ class PairRDDFunctions[K, V](self: RDD[(K, V)])
                 + ", writerSize = "
                 + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(writer)))
             }
+            */
 
             // Update bytes written metric every few records
             maybeUpdateOutputMetrics(outputMetricsAndBytesWrittenCallback, recordsWritten)

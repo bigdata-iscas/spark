@@ -187,7 +187,7 @@ public class TaskMemoryManager {
       }
 
       consumers.add(consumer);
-      logger.debug("[Acquired] Task {} acquired {} (currentMem = {}) for {}", taskAttemptId, Utils.bytesToString(got),
+      logger.debug("[Acquired] Task {} finally acquired {} (currentMem = {}) for {}", taskAttemptId, Utils.bytesToString(got),
               Utils.bytesToString(consumer.getUsed() + got), consumer);
       return got;
     }
@@ -200,8 +200,9 @@ public class TaskMemoryManager {
     logger.debug("[Release] Task {} release {} from {}", taskAttemptId, Utils.bytesToString(size), consumer);
     memoryManager.releaseExecutionMemory(size, taskAttemptId, consumer.getMode());
 
+    /*
     if (logger.isDebugEnabled()) {
-      System.gc();
+      // System.gc();
       MemoryMXBean memoryMXBean = ManagementFactory.getMemoryMXBean();
       MemoryUsage heapUsage = memoryMXBean.getHeapMemoryUsage();
       long used = heapUsage.getUsed();
@@ -213,6 +214,7 @@ public class TaskMemoryManager {
               + org.apache.spark.util.Utils.bytesToString(committed)
               + ", max = " + org.apache.spark.util.Utils.bytesToString(max));
     }
+    */
 
   }
 
