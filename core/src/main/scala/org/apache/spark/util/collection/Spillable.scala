@@ -17,6 +17,9 @@
 
 package org.apache.spark.util.collection
 
+import java.lang.management.{BufferPoolMXBean, ManagementFactory}
+import java.util
+
 import org.apache.spark.SparkEnv
 import org.apache.spark.internal.Logging
 import org.apache.spark.memory.{MemoryConsumer, MemoryMode, TaskMemoryManager}
@@ -73,6 +76,21 @@ private[spark] abstract class Spillable[C](taskMemoryManager: TaskMemoryManager)
   // Number of spills
   private[this] var _spillCount = 0
 
+  private[this] val pools: util.List[BufferPoolMXBean]
+    = ManagementFactory.getPlatformMXBeans(classOf[BufferPoolMXBean])
+
+  def getDirectBufferUsage(): Unit = {
+    if (log.isDebugEnabled()) {
+      import scala.collection.JavaConverters._
+      for (b <- pools.asScala) {
+        if (b.getName == "direct") {
+          logDebug("[DirectBufferPool] used = " + b.getMemoryUsed / 1024 / 1024
+            + " MB, total = " + b.getTotalCapacity / 1024 / 1024 + " MB")
+        }
+      }
+    }
+  }
+
   /**
    * Spills the current in-memory collection to disk if needed. Attempts to acquire more
    * memory before spilling.
@@ -90,6 +108,7 @@ private[spark] abstract class Spillable[C](taskMemoryManager: TaskMemoryManager)
         + ", inMemRecordsNum = " + collectionLength
         + ", currentMemory = " + org.apache.spark.util.Utils.bytesToString(currentMemory)
         + ", myMemoryThreshold = " + org.apache.spark.util.Utils.bytesToString(myMemoryThreshold))
+      getDirectBufferUsage()
       val granted = acquireMemory(amountToRequest)
       myMemoryThreshold += granted
       // If we were granted too little memory to grow further (either tryToAcquire returned 0,

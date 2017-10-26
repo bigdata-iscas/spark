@@ -18,7 +18,8 @@
 package org.apache.spark.util.collection
 
 import java.io._
-import java.lang.management.ManagementFactory
+import java.lang.management.{BufferPoolMXBean, ManagementFactory}
+import java.util
 import java.util.Comparator
 
 import scala.collection.BufferedIterator
@@ -126,6 +127,9 @@ class ExternalAppendOnlyMap[K, V, C](
 
   private val memoryMXBean = ManagementFactory.getMemoryMXBean
 
+  private[this] val pools: util.List[BufferPoolMXBean]
+      = ManagementFactory.getPlatformMXBeans(classOf[BufferPoolMXBean])
+
 
   def getHeapUsage(): String = {
     // System.gc()
@@ -228,6 +232,7 @@ class ExternalAppendOnlyMap[K, V, C](
       + ", bytesWritten = " + org.apache.spark.util.Utils.bytesToString(spill_bytesWritten)
       + ", avgRecordSize = " +
       org.apache.spark.util.Utils.bytesToString(spill_bytesWritten / spill_recordsWritten))
+    getDirectBufferUsage()
   }
 
   /**
@@ -261,6 +266,7 @@ class ExternalAppendOnlyMap[K, V, C](
         logDebug("[Serialized buffer in flush()] writerSize = "
           + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(writer))
         )
+        getDirectBufferUsage()
       }
 
       val segment = writer.commitAndGet()
@@ -277,11 +283,13 @@ class ExternalAppendOnlyMap[K, V, C](
         writer.write(kv._1, kv._2)
 
         if (estimateRecordSizeInterval > 0 && objectsWritten % estimateRecordSizeInterval == 0) {
-          logDebug("[SpillRecord] recordIndex = " + (objectsWritten + 1)
+          logDebug("[SpillRecord] recordIndex = " + (objectsWritten + 1) + "/"
+            + writeMetrics.recordsWritten
             + ", recordUnSerializedSize = "
             + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(kv))
             + ", record = (" + kv._1.getClass.getSimpleName + ", "
             + kv._2.getClass.getSimpleName + ")")
+          getDirectBufferUsage()
         }
 
         objectsWritten += 1
@@ -313,6 +321,7 @@ class ExternalAppendOnlyMap[K, V, C](
     logDebug("[DiskMapIterator] file = " + file.getAbsolutePath + ", blockId = "
             + blockId + ", batchSizes = " + batchSizes)
 
+    getDirectBufferUsage()
     new DiskMapIterator(file, blockId, batchSizes)
   }
 
@@ -469,6 +478,7 @@ class ExternalAppendOnlyMap[K, V, C](
         logDebug("[RecordReadFromMergeHeap.afterMerge] mergeHeapLength = " + mergeHeap.size
           + ", mergedBuffersLength = "
           + mergedBuffers.length)
+        getDirectBufferUsage()
         /*
         for (i <- 0 until mergedBuffers.length) {
           logDebug("  [StreamBuffer " + i + "] " + mergedBuffers(i).showSize + ", " +
@@ -500,6 +510,7 @@ class ExternalAppendOnlyMap[K, V, C](
           logDebug("  [StreamBuffer " + i + "]" + mergedBuffers(i).showSize + ", " +
             mergedBuffers(i).iterator.getClass.getSimpleName)
         }
+        getDirectBufferUsage()
       }
 
       recordsRead += 1
@@ -566,6 +577,7 @@ class ExternalAppendOnlyMap[K, V, C](
     private var deserializeStream = nextBatchStream()
     private var nextItem: (K, C) = null
     private var objectsRead = 0
+    private var totalObjectsRead = 0
 
     /**
      * Construct a stream that reads only from the next batch.
@@ -610,7 +622,10 @@ class ExternalAppendOnlyMap[K, V, C](
             + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(deser))
             + ", bufferedStream = "
             + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(wrappedStream)))
+
         }
+        getDirectBufferUsage()
+
         deser
       } else {
         // No more batches left
@@ -633,15 +648,18 @@ class ExternalAppendOnlyMap[K, V, C](
         item = (k, c)
 
         if (estimateRecordSizeInterval > 0 && objectsRead % estimateRecordSizeInterval == 0) {
-          logDebug("[RecordReadFromDisk] recordIndex = " + (objectsRead + 1)
+          logDebug("[RecordReadFromDisk] recordIndex = " + (objectsRead + 1) + "/"
+            + (totalObjectsRead + objectsRead + 1)
             + ", recordUnSerializedSize = "
             + org.apache.spark.util.Utils.bytesToString(SizeEstimator.estimate(item))
             + ", record = (" + item._1.getClass.getSimpleName + ", "
             + item._2.getClass.getSimpleName + ")")
+          getDirectBufferUsage()
         }
 
         objectsRead += 1
         if (objectsRead == serializerBatchSize) {
+          totalObjectsRead += objectsRead
           objectsRead = 0
           deserializeStream = nextBatchStream()
         }

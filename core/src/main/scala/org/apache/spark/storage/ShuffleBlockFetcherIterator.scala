@@ -18,6 +18,8 @@
 package org.apache.spark.storage
 
 import java.io.InputStream
+import java.lang.management.{BufferPoolMXBean, ManagementFactory}
+import java.util
 import java.util.concurrent.LinkedBlockingQueue
 import javax.annotation.concurrent.GuardedBy
 
@@ -117,6 +119,9 @@ final class ShuffleBlockFetcherIterator(
   @GuardedBy("this")
   private[this] var isZombie = false
 
+  private[this] val pools: util.List[BufferPoolMXBean]
+      = ManagementFactory.getPlatformMXBeans(classOf[BufferPoolMXBean])
+
   initialize()
 
   // Decrements the buffer reference count.
@@ -164,6 +169,16 @@ final class ShuffleBlockFetcherIterator(
     val sizeMap = req.blocks.map { case (blockId, size) => (blockId.toString, size) }.toMap
     val remainingBlocks = new HashSet[String]() ++= sizeMap.keys
     val blockIds = req.blocks.map(_._1.toString)
+
+    if (log.isDebugEnabled()) {
+      import scala.collection.JavaConverters._
+      for (b <- pools.asScala) {
+        if (b.getName == "direct") {
+          logDebug("[DirectBufferPool] used = " + b.getMemoryUsed / 1024 / 1024
+            + " MB, total = " + b.getTotalCapacity / 1024 / 1024 + " MB")
+        }
+      }
+    }
 
     val address = req.address
     shuffleClient.fetchBlocks(address.host, address.port, address.executorId, blockIds.toArray,
