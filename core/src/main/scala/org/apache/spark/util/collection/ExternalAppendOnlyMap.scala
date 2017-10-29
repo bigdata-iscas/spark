@@ -282,7 +282,8 @@ class ExternalAppendOnlyMap[K, V, C](
         val kv = inMemoryIterator.next()
         writer.write(kv._1, kv._2)
 
-        if (estimateRecordSizeInterval > 0 && objectsWritten % estimateRecordSizeInterval == 0) {
+        if (estimateRecordSizeInterval > 0 &&
+            writeMetrics.recordsWritten % estimateRecordSizeInterval == 0) {
           logDebug("[SpillRecord] recordIndex = " + (objectsWritten + 1) + "/"
             + writeMetrics.recordsWritten
             + ", recordUnSerializedSize = "
@@ -613,7 +614,7 @@ class ExternalAppendOnlyMap[K, V, C](
         val wrappedStream = serializerManager.wrapStream(blockId, bufferedStream)
         val deser = ser.deserializeStream(wrappedStream)
 
-        logDebug("[DiskMapIterator.afterDeserializeStream.heapUsage] " + getHeapUsage)
+        // logDebug("[DiskMapIterator.afterDeserializeStream.heapUsage] " + getHeapUsage)
 
         if (estimateDeserMemory) {
           logDebug("[DiskMapIterator.deserializer.memoryUsage] serSize = "
@@ -647,7 +648,8 @@ class ExternalAppendOnlyMap[K, V, C](
         val c = deserializeStream.readValue().asInstanceOf[C]
         item = (k, c)
 
-        if (estimateRecordSizeInterval > 0 && objectsRead % estimateRecordSizeInterval == 0) {
+        if (estimateRecordSizeInterval > 0 &&
+            (totalObjectsRead + objectsRead + 1) % estimateRecordSizeInterval == 0) {
           logDebug("[RecordReadFromDisk] recordIndex = " + (objectsRead + 1) + "/"
             + (totalObjectsRead + objectsRead + 1)
             + ", recordUnSerializedSize = "
@@ -753,7 +755,7 @@ class ExternalAppendOnlyMap[K, V, C](
 
         logInfo(s"[Task ${context.taskAttemptId} SpillMetrics] release = " +
           org.apache.spark.util.Utils.bytesToString(getUsed()) + ", writeTime = "
-          + spill_writeTime + " s, recordsWritten = " + spill_recordsWritten
+          + spill_writeTime / 1000 + " s, recordsWritten = " + spill_recordsWritten
           + ", bytesWritten = " + org.apache.spark.util.Utils.bytesToString(spill_bytesWritten)
           + ", avgRecordSize = " +
           org.apache.spark.util.Utils.bytesToString(spill_bytesWritten / spill_recordsWritten))
