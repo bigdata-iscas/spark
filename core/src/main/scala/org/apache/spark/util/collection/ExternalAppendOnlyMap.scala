@@ -229,9 +229,9 @@ class ExternalAppendOnlyMap[K, V, C](
     logInfo(s"[Task ${context.taskAttemptId} SpillMetrics] release = " +
       org.apache.spark.util.Utils.bytesToString(getUsed()) + ", writeTime = "
       + spill_writeTime + " s, recordsWritten = " + spill_recordsWritten
-      + ", bytesWritten = " + org.apache.spark.util.Utils.bytesToString(spill_bytesWritten)
-      + ", avgRecordSize = " +
-      org.apache.spark.util.Utils.bytesToString(spill_bytesWritten / spill_recordsWritten))
+      + ", bytesWritten = " + org.apache.spark.util.Utils.bytesToString(spill_bytesWritten))
+      // + ", avgRecordSize = " +
+      // org.apache.spark.util.Utils.bytesToString(spill_bytesWritten / spill_recordsWritten))
     getDirectBufferUsage()
   }
 
@@ -756,9 +756,9 @@ class ExternalAppendOnlyMap[K, V, C](
         logInfo(s"[Task ${context.taskAttemptId} SpillMetrics] release = " +
           org.apache.spark.util.Utils.bytesToString(getUsed()) + ", writeTime = "
           + spill_writeTime / 1000 + " s, recordsWritten = " + spill_recordsWritten
-          + ", bytesWritten = " + org.apache.spark.util.Utils.bytesToString(spill_bytesWritten)
-          + ", avgRecordSize = " +
-          org.apache.spark.util.Utils.bytesToString(spill_bytesWritten / spill_recordsWritten))
+          + ", bytesWritten = " + org.apache.spark.util.Utils.bytesToString(spill_bytesWritten))
+          // + ", avgRecordSize = " +
+          // org.apache.spark.util.Utils.bytesToString(spill_bytesWritten / spill_recordsWritten))
 
         hasSpilled = true
         true
