@@ -18,11 +18,13 @@
 package org.apache.spark.scheduler
 
 import java.io._
+import java.lang.management.ManagementFactory
 import java.nio.ByteBuffer
 
 import scala.collection.mutable.ArrayBuffer
 
 import org.apache.spark.SparkEnv
+import org.apache.spark.internal.Logging
 import org.apache.spark.serializer.SerializerInstance
 import org.apache.spark.storage.BlockId
 import org.apache.spark.util.{AccumulatorV2, Utils}
@@ -38,14 +40,28 @@ private[spark] case class IndirectTaskResult[T](blockId: BlockId, size: Int)
 private[spark] class DirectTaskResult[T](
     var valueBytes: ByteBuffer,
     var accumUpdates: Seq[AccumulatorV2[_, _]])
-  extends TaskResult[T] with Externalizable {
+  extends TaskResult[T] with Externalizable with Logging {
 
   private var valueObjectDeserialized = false
   private var valueObject: T = _
 
   def this() = this(null.asInstanceOf[ByteBuffer], null)
 
+  def getHeapUsage(): String = {
+    val memoryMXBean = ManagementFactory.getMemoryMXBean
+    // System.gc()
+    val heapUsage = memoryMXBean.getHeapMemoryUsage
+    val used = heapUsage.getUsed
+    val committed = heapUsage.getCommitted
+    val max = heapUsage.getMax
+    "used = " + org.apache.spark.util.Utils.bytesToString(used) +
+      ", committed = " + org.apache.spark.util.Utils.bytesToString(committed) +
+      ", max = " + org.apache.spark.util.Utils.bytesToString(max)
+  }
+
   override def writeExternal(out: ObjectOutput): Unit = Utils.tryOrIOException {
+    logDebug("[CurrentHeapUsage] " + getHeapUsage)
+    logDebug("Capacity = " + valueBytes.capacity() + ", remaining = " + valueBytes.remaining())
     out.writeInt(valueBytes.remaining)
     Utils.writeByteBuffer(valueBytes, out)
     out.writeInt(accumUpdates.size)
